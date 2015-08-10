@@ -1,2 +1,4 @@
 ./cimg/examples/*
 ./cimg/resources/*
+*.o
+hough
