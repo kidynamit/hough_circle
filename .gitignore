@@ -1,4 +1,4 @@
-./cimg/examples/*
-./cimg/resources/*
+cimg/examples/*
+cimg/resources/*
 *.o
-hough
+./hough
