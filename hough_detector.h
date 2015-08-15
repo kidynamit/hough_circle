@@ -21,7 +21,7 @@ private:
     void canny_edge_detector ( );
     void hough_circle_detector ( );
 
-    void accumulate_circle(IMG_TYPE & hough, const int x, const int y, const int radius );
+    int accumulate_circle(IMG_TYPE & hough, const int x, const int y, const int radius );
     void draw_circle(IMG_TYPE & hough, const int x, const int y, const int radius );
 	void gaussian_filter ( double **& kernel , double & kernel_sum, const int idx_in = 0, const int idx_out=1);
 public:

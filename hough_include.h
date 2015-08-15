@@ -3,7 +3,7 @@
 
 #define IMAGEPATH   "sandbox/images/"
 #define PI          3.14159265359
-#define MIN_RADIUS  3
+#define MIN_RADIUS  5
 
 #define LOG(TYPE, REASON) std::clog << #TYPE << "\t"<< __FILE__ << ":" << __LINE__ << "\t" << (REASON) << std::endl;
 
@@ -35,7 +35,8 @@ static const PIXEL_TYPE NULL_PIXEL = (PIXEL_TYPE)0;
 
 #define MAX_DIM 3
 
-struct kd_node_t{
+struct kd_node_t
+{
     double x[MAX_DIM];
     struct kd_node_t *left, *right;
 };

@@ -2,7 +2,7 @@ LIBRARIES = -lpthread -lm -lX11 -lstdc++ -fopenmp
 INCLUDES = -I./cimg
 CXX_FLAGS = -Wall -W -std=c++11 -Dcimg_use_openmp 
 
-SOURCE = hough_view.cpp hough_detector.cpp main.cpp
+SOURCE = hough_view.cpp kdtree.cpp hough_detector.cpp main.cpp
 OBJECTS = $(SOURCE:.cpp=.o)
 EXEC = hough
 

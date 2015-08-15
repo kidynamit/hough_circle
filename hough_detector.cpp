@@ -1,6 +1,6 @@
 #include "hough_detector.h"
 
-#define RERENDER ;//{ _display.resize ( _display, false).display(_images); }//_display.show ();}
+#define RERENDER { _display.resize ( _display, false).display(_images); }//_display.show ();}
 
 hough_detector::hough_detector (const char * file, double sigma , int gaussian_window, double max_thresh, double min_thresh)
 	: _sigma(sigma), 
@@ -9,8 +9,8 @@ hough_detector::hough_detector (const char * file, double sigma , int gaussian_w
 	_min_threshold(min_thresh)
 {
 	_filename = const_cast<char*>(std::string(file).c_str());
+	_hcd_threshold = 2.4;   
 	init ();
-	_hcd_threshold = 46.0;   
 }
 
 hough_detector::~hough_detector()
@@ -42,7 +42,7 @@ void hough_detector::init()
 		_min_radius = MIN_RADIUS;
 		_max_radius = ( width > height ) ? height / 2 : width / 2;
 
-		for ( int i = 0; i < 3 ; i++)
+		for ( int i = 0; i < 4 ; i++)
 			_images.push_back( IMG_TYPE(width, height));
 
 		std::stringstream ss ;
@@ -56,7 +56,9 @@ void hough_detector::init()
 	}
 	double ** kernel = nullptr;
 	double kernel_sum = 0.0;
-	gaussian_filter ( kernel, kernel_sum ); 
+	
+	_display = CImgDisplay( _images, DISPLAY_TITLE, 0);
+    gaussian_filter ( kernel, kernel_sum ); 
 	canny_edge_detector () ;
     hough_circle_detector ();
 	if ( kernel )
@@ -66,7 +68,6 @@ void hough_detector::init()
 		delete [] kernel;
 	}
     
-	_display = CImgDisplay( _images, DISPLAY_TITLE, 0);
 }
 
 void hough_detector::event_loop()
@@ -131,71 +132,50 @@ void hough_detector::event_loop()
 		} 
 		if ( _display.is_keyV() )
 		{ 
-			if ( _hcd_threshold + 2 < STRONG_PIXEL )
+			if ( _hcd_threshold + 0.1 < STRONG_PIXEL )
 			{
-				_hcd_threshold += 2;
+				_hcd_threshold += 0.1;
 				redetect_circle = true;
 			}       
 		} 
 		
 		if ( _display.is_keyB() )
 		{ 
-			if ( _hcd_threshold / 2 != 0)
+        	if ( _hcd_threshold - 0.1 != 0.0)
 			{
-				_hcd_threshold-= 2;
+				_hcd_threshold-= 0.1;
 				redetect_circle = true;
 			}       
 		} 
 		if ( reblur )
 		{ 
-			std::stringstream ss;
-			ss << "Applying Gaussian filter: \t\t\t" << _sigma << " , "<< _gaussian_window; 
-			LOG(INFO, ss.str().c_str() );
 			kernel = nullptr;
 			kernel_sum = 0.0;
 			gaussian_filter (kernel, kernel_sum);
-			_display.set_title ( (DISPLAY_TITLE " ... Applying Gaussian Filter") );
-			cimg::wait (1000);
-			_display.set_title ( (DISPLAY_TITLE " ... Ready!") );
-			cimg::wait (1000);
-			_display.set_title ( (DISPLAY_TITLE) );
 			redetect = true;
             redetect_circle = true;
 		}
 		if (redetect)
 		{
-			std::stringstream ss;
-			ss << "Applying Canny Edge Detection: \t\t\t"  <<  _min_threshold << " , "<< _max_threshold; 
-			LOG(INFO, ss.str().c_str() );
 			canny_edge_detector () ;
-			_display.set_title ( (DISPLAY_TITLE " ... Applying Canny Edge Detection") );
-			cimg::wait (4000);
-			_display.set_title ( (DISPLAY_TITLE " ... Ready!") );
-			cimg::wait (1000);
-			_display.set_title ( (DISPLAY_TITLE) );
             redetect_circle = true;
 		}
 
 		if (redetect_circle)
 		{
-			std::stringstream ss;
-			ss << "Applying Hough Circle Detection: \t\t" << _hcd_threshold <<" - "  <<  _min_radius<< " , "<< _max_radius; 
-			LOG(INFO, ss.str().c_str() );
 		    hough_circle_detector () ;
-			_display.set_title ( (DISPLAY_TITLE " ... Applying Hough Circle Detection") );
-			cimg::wait (4000);
-			_display.set_title ( (DISPLAY_TITLE " ... Ready!") );
-			cimg::wait (1000);
-			_display.set_title ( (DISPLAY_TITLE) );
 		}
-        _display.resize ( _display, false).display(_images).wait(25 );
 	}
 }
 
 void hough_detector::gaussian_filter( double **& kernel, double& kernel_sum, const int idx_in, const int idx_out)
 {
-    // _display.close();
-	if (_gaussian_window %2 == 0)
+    std::stringstream ss;
+	ss << "Applying Gaussian filter: \t\t\t" << _sigma << " , "<< _gaussian_window; 
+	LOG(INFO, ss.str().c_str() );
+	_display.set_title ( (DISPLAY_TITLE " ... Applying Gaussian Filter") );
+	
+    if (_gaussian_window %2 == 0)
 	{
 		LOG(ERROR, "gaussian window size is even");
 		return;
@@ -254,12 +234,19 @@ void hough_detector::gaussian_filter( double **& kernel, double& kernel_sum, con
 		delete [] kernel[i];
 	delete [] kernel ;
 	kernel = nullptr;
-    std::clog << "DONE" << std::endl;
+    
+    _display.set_title ( (DISPLAY_TITLE " ... Ready!") );
+	cimg::wait (1000);
     RERENDER;
+    _display.set_title ( (DISPLAY_TITLE) );
 }
 
 void hough_detector::canny_edge_detector () 
 {
+    std::stringstream ss;
+	ss << "Applying Canny Edge Detection: \t\t\t"  <<  _min_threshold << " , "<< _max_threshold; 
+	LOG(INFO, ss.str().c_str() );
+    
     //_display.close();
 	const int width = _images[0].width ();
 	const int height = _images[0].height ();
@@ -268,7 +255,7 @@ void hough_detector::canny_edge_detector ()
 	IMG_TYPE output_image ( width , height) ;
 	IMG_TYPE hysterized_image (width, height);
     
-    double GX[width][height], GY[width][height];
+    double GX[width][height], GY[width][height], THETA[width][height];
 
 	const int SobelY [3][3] =
 		{ 
@@ -276,33 +263,33 @@ void hough_detector::canny_edge_detector ()
 			{0, 0, 0}, 
 			{1, 2, 1}
 		};
-    // const int Vertical [3][3] =
-    //     {
-    //         { -1, 2, -1}, 
-    //         { -1, 2, -1}, 
-    //         { -1, 2, -1}
-    //     };
+    const int Vertical [3][3] =
+        {
+            { -1, 2, -1}, 
+            { -1, 2, -1}, 
+            { -1, 2, -1}
+        };
     
-    // const int Horizontal [3][3] =
-    //     {
-    //         { -1, -1, -1}, 
-    //         { 2, 2, 2}, 
-    //         { -1, -1, -1}
-    //     };
+    const int Horizontal [3][3] =
+        {
+            { -1, -1, -1}, 
+            { 2, 2, 2}, 
+            { -1, -1, -1}
+        };
 
-    // const int LeftDiagonal [3][3] =
-    //     {
-    //         { 2, -1, -1}, 
-    //         { -1, 2, -1}, 
-    //         { -1, -1, 2}
-    //     };
+    const int LeftDiagonal [3][3] =
+        {
+            { 2, -1, -1}, 
+            { -1, 2, -1}, 
+            { -1, -1, 2}
+        };
 
-    // const int RightDiagonal [3][3] =
-    //     {
-    //         { -1, -1, 2}, 
-    //         { -1, 2, -1}, 
-    //         { 2, -1, -1}
-    //     };
+    const int RightDiagonal [3][3] =
+        {
+            { -1, -1, 2}, 
+            { -1, 2, -1}, 
+            { 2, -1, -1}
+        };
 	// convolve image 
 	for ( int row = 0 ; row < width ; row++ )
 	{
@@ -343,7 +330,7 @@ void hough_detector::canny_edge_detector ()
 			if ( GX[row][col] != 0.0 ) 
 				theta = atan(GY[row][col] / GX[row][col]); 
 			else
-				theta = PI/2 ;
+				theta = PI/2.0;
 			// classify
 			if ( theta >= -PI/8.0 && theta < PI/8.0 ) 
 			{
@@ -363,7 +350,10 @@ void hough_detector::canny_edge_detector ()
 			}
 			else 
 			{}
+            if (theta < 0.0 )
+                theta = theta + PI;
 
+            THETA[row][col] = PI/2.0 - (theta) + 2.0 * PI; 
 
 			int r_left = row - y; 
 			int r_right = row + y;
@@ -439,99 +429,123 @@ void hough_detector::canny_edge_detector ()
 	}
    
 
-    // cimg_forXY(hysterized_image, row, col)
-    // {
-    //     if (hysterized_image(row, col) != STRONG_PIXEL )
-    //         output_image(row, col) = NULL_PIXEL;
-    //     else
-    //     {
-    //         double vert_sum = 0 , hor_sum = 0, leftdiag_sum = 0, rightdiag_sum = 0;
-    //         for ( int i = -1; i<= 1; i++ )
-    //         {
-    //             for ( int j = -1; j <= 1; j++ )
-    //             {
-    //                 int r = row + i;
-    //                 int c = col + j;
+    cimg_forXY(hysterized_image, row, col)
+    {
+        if (hysterized_image(row, col) != STRONG_PIXEL )
+            output_image(row, col) = NULL_PIXEL;
+        else
+        {
+            
+            double vert_sum = 0 , hor_sum = 0, leftdiag_sum = 0, rightdiag_sum = 0;
+            for ( int i = -1; i<= 1; i++ )
+            {
+                for ( int j = -1; j <= 1; j++ )
+                {
+                    int r = row + i;
+                    int c = col + j;
                     
-    //                 if ( r < width && r >= 0 && c < height && c >= 0)
-    //                 {
-    //                     vert_sum += Vertical[i + 1][j + 1] * hysterized_image(r, c);     
-    //                     hor_sum += Horizontal[i + 1][j + 1] * hysterized_image(r, c);     
-    //                     leftdiag_sum += LeftDiagonal[i + 1][j + 1] * hysterized_image(r, c);     
-    //                     rightdiag_sum += RightDiagonal[i + 1][j + 1] * hysterized_image(r, c);     
-    //                 }
+                    if ( r < width && r >= 0 && c < height && c >= 0)
+                    {
+                        vert_sum += Vertical[i + 1][j + 1] * THETA[r][c] / THETA[row][col];    
+                        hor_sum += Horizontal[i + 1][j + 1] * THETA[r][c]/ THETA[row][col];    
+                        leftdiag_sum += LeftDiagonal[i + 1][j + 1] * THETA[r][c]/ THETA[row][col];    
+                        rightdiag_sum += RightDiagonal[i + 1][j + 1] * THETA[r][c]/ THETA[row][col];    
+                    }
 
-    //             }
-    //         }
-    //         double thresh = 2.0 * STRONG_PIXEL * 3.0;
-    //         if ( vert_sum > thresh || 
-    //                 hor_sum > thresh || 
-    //                 leftdiag_sum > thresh ||
-    //                 rightdiag_sum > thresh
-    //            )
-    //         {
-    //             output_image(row, col) = NULL_PIXEL;
-    //         }
-    //         else
-    //         {
-    //             output_image(row, col) = STRONG_PIXEL;
-    //         }
-    //     }
-    // }
+                }
+            }
+            double max_sum = vert_sum ;
+            if (max_sum < hor_sum ) max_sum = hor_sum;
+            if (max_sum < leftdiag_sum ) max_sum = leftdiag_sum;
+            if (max_sum < rightdiag_sum ) max_sum = rightdiag_sum;
+        
+            double thresh = 0.02 *THETA[row][col];
+            if ( max_sum > thresh)
+            {
+                output_image(row, col) = NULL_PIXEL;
+            }
+            else
+            {
+                output_image(row, col) = STRONG_PIXEL;
+            }
+        }
+    }
 
 	//std::clog << "max " << max_magnitude << " min "<< min_magnitude << std::endl;
-	_images[2] = hysterized_image;  
-    std::clog << "DONE" << std::endl;
+	_images[2] = output_image;  
+    
+    _display.set_title ( (DISPLAY_TITLE " ... Ready!") );
+	cimg::wait (1000);
     RERENDER;
+    _display.set_title ( (DISPLAY_TITLE) );
 }
 
 void hough_detector::hough_circle_detector ()
 {
+	std::stringstream ss;
+    ss << "Applying Hough Circle Detection: \t\t" << _hcd_threshold <<" - "  <<  _min_radius<< " , "<< _max_radius; 
+	LOG(INFO, ss.str().c_str() );
 
-	// _display.close();
+    _display.set_title ( (DISPLAY_TITLE " ... Applying Hough Circle Detection") );
+    
+    // _display.close();
     const int width = _images[0].width();
 	const int height = _images[0].height();
 	
 	// construct list 
     IMG_TYPE out_image (width, height);
-	
+	IMG_TYPE accumulator (width, height );
     cimg_forXY(out_image, x, y) out_image(x, y) = NULL_PIXEL;
 
+	IMG_TYPE hough (width, height);
 	for ( UINT radius = _min_radius; radius < _max_radius ; radius ++ ) 
 	{
 		
-		IMG_TYPE hough (width, height);
         cimg_forXY(hough, x, y) hough(x, y) = NULL_PIXEL;
+        int num_pixels = 0;
+        int total = 0;
+		for ( UINT x = 0 ;  x < width ; x ++ ) 
+        {
+            for ( UINT y = 0; y < height ; y++ )
+		    {
+			    if ( _images[2](x, y) == STRONG_PIXEL)
+			    {            
+                    num_pixels += accumulate_circle ( hough, x, y, radius);
+                    total ++;
+			    }
+		    }
+        }
 
-		cimg_forXY(_images[2], x, y) 
-		{
-			if ( _images[2](x, y) == STRONG_PIXEL)
-			{         
-                accumulate_circle ( hough, x, y, radius);
-			}
-		}
-        double threshold = _hcd_threshold; 
-
-		cimg_forXY(hough, x, y)
-		{
-			if ( hough(x, y) > threshold)
-			{
-				draw_circle ( out_image, x, y, radius);
-			} 
-		}
+        double threshold =  (num_pixels )/ (total * _hcd_threshold); 
+        // double threshold = _hcd_threshold ;
+		for ( UINT x = 0;  x < width ; x ++ ) 
+        {
+            for ( UINT y = 0; y < height ; y++ )
+		    {
+			    if ( ( hough(x, y)) > threshold)
+			    {
+				    draw_circle ( out_image, x, y, radius);
+			    } 
+		    }
+        }
 	}
-    _images[3] = out_image;
-    std::clog << "DONE" << std::endl;
+    _images[3] = hough;
+    _images[4] = out_image;
+    
+    _display.set_title ( (DISPLAY_TITLE " ... Ready!") );
+	cimg::wait (1000);
     RERENDER;
+    _display.set_title ( (DISPLAY_TITLE) );
 }
 
-void hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int y , const int radius )
+int hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int y , const int radius )
 {
     const int width = hough.width ();
     const int height = hough.height ();
 
 	int r = radius;
 	int c = 0;
+    int num_pixels_set = 0;
 	int decider_2 = 1 - r ;
 	while (r >= c)
 	{
@@ -545,6 +559,7 @@ void hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int
 				if ( idx_x >= 0 && idx_x < width && idx_y >= 0 && idx_y < height ) 
 				{	
 					hough(idx_x, idx_y) = hough(idx_x, idx_y) + 1;
+                    num_pixels_set ++;
 				}
 				idx_x = x + c * i;
 				idx_y = y + r * j;
@@ -552,6 +567,7 @@ void hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int
 				if ( idx_x >= 0 && idx_x < width && idx_y >= 0 && idx_y < height ) 
 				{
 					hough(idx_x, idx_y) = hough(idx_x, idx_y) + 1;
+                    num_pixels_set ++;
 				}
 			}
 		}
@@ -568,6 +584,7 @@ void hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int
 		}
 
 	}
+    return num_pixels_set; 
 }
 
 void hough_detector::draw_circle (IMG_TYPE & hough, const int x, const int y , const int radius )

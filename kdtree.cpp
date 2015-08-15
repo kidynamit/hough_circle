@@ -33,16 +33,17 @@ kdtree::make_tree(struct kd_node_t *t, int len, int i)
  
 	if (!len) return 0;
  
-	if ((n = find_median(t, t + len, i))) {
+	if ((n = find_median(t, t + len, i))) 
+    {
 		i = (i + 1) % _dim;
-		n->left  = make_tree(t, n - t, i)
+		n->left  = make_tree(t, n - t, i);
 		n->right = make_tree(n + 1, t + len - (n + 1), i);
 	}
 	return n;
 }
 
 struct kd_node_t*
-find_median(struct kd_node_t *start, struct kd_node_t *end, int idx)
+kdtree::find_median(struct kd_node_t *start, struct kd_node_t *end, int idx)
 {
 	if (end <= start) return NULL;
 	if (end == start + 1)
@@ -50,18 +51,19 @@ find_median(struct kd_node_t *start, struct kd_node_t *end, int idx)
  
 	struct kd_node_t *p, *store, *md = start + (end - start) / 2;
 	double pivot;
-	while (1) {
+	while (1) 
+    {
 		pivot = md->x[idx];
- 
-		swap(md, end - 1);
+        struct kd_node_t * prev = end - 1;
+		swap_node(md, prev);
 		for (store = p = start; p < end; p++) {
 			if (p->x[idx] < pivot) {
 				if (p != store)
-					swap(p, store);
+					swap_node(p, store);
 				store++;
 			}
 		}
-		swap(store, end - 1);
+		swap_node(store, end - 1);
  
 		/* median has duplicate values */
 		if (store->x[idx] == md->x[idx])
@@ -72,8 +74,12 @@ find_median(struct kd_node_t *start, struct kd_node_t *end, int idx)
 	}
 }
 
+void kdtree::nearest(struct kd_node_t *& node, struct kd_node_t *& best, double & dist )
+{
+
+}
 double
-kdtree::dist(struct kd_node_t *a, struct kd_node_t *b)
+kdtree::dist(struct kd_node_t *& a, struct kd_node_t *& b)
 {
 	double t, d = 0;
 	UINT dim = _dim;
@@ -86,7 +92,17 @@ kdtree::dist(struct kd_node_t *a, struct kd_node_t *b)
 
 kdtree::kdtree(UINT dim) : _dim(dim)
 {
-	_root = make_tree ()	
+    _root = nullptr;
 }
+
+void kdtree::swap_node(struct kd_node_t *x, struct kd_node_t * y)
+{
+    double tmp[MAX_DIM];
+    memcpy(tmp,  x->x, sizeof(tmp));
+	memcpy(x->x, y->x, sizeof(tmp));
+	memcpy(y->x, tmp,  sizeof(tmp));
+}
+
+
 
 // REFERENCE: http://rosettacode.org/wiki/K-d_tree
