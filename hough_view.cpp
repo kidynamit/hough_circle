@@ -15,3 +15,11 @@ UINT nCr(UINT n, UINT r)
 	}
 	return c;
 }
+
+void clamp( int & val, const int start, const int end ) 
+{
+    if ( val < start ) 
+        val = start;
+    else if ( val > end ) 
+        val = end;
+}
