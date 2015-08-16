@@ -16,10 +16,14 @@ private:
 
     UINT _min_radius, _max_radius;
     double _max_threshold, _min_threshold;
-    PIXEL_TYPE _hcd_threshold;
+    PIXEL_TYPE _hcd_threshold, _hld_threshold;
     void init ();
     void canny_edge_detector ( );
     void hough_circle_detector ( );
+
+    void hough_line_detector (IMG_TYPE & in_image);
+	void unmark_line( IMG_TYPE & hough, const int m, const int c);
+    void accumulate_line( IMG_TYPE & hough, const int m, const int c);
 
     int accumulate_circle(IMG_TYPE & hough, const int x, const int y, const int radius );
     void draw_circle(IMG_TYPE & hough, const int x, const int y, const int radius );
