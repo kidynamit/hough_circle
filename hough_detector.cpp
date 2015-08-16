@@ -9,8 +9,8 @@ hough_detector::hough_detector (const char * file, double sigma , int gaussian_w
 	_min_threshold(min_thresh)
 {
 	_filename = const_cast<char*>(std::string(file).c_str());
-	_hcd_threshold = 2.4;   
-	_hld_threshold = 2.4;
+	_hcd_threshold = 4;   
+	_hcd_low_threshold = 0.75 ;
 	init ();
 }
 
@@ -43,7 +43,7 @@ void hough_detector::init()
 		_min_radius = MIN_RADIUS;
 		_max_radius = ( width > height ) ? height / 2 : width / 2;
 
-		for ( int i = 0; i < 5; i++)
+		for ( int i = 0; i < 3; i++)
 			_images.push_back( IMG_TYPE(width, height));
 
 		std::stringstream ss ;
@@ -151,18 +151,18 @@ void hough_detector::event_loop()
 
 		if ( _display.is_keyQ() )
 		{ 
-			if ( _hld_threshold + 0.1 < STRONG_PIXEL )
+			if ( _hcd_low_threshold + 0.05 < 1.0 )
 			{
-				_hld_threshold += 0.1;
+				_hcd_low_threshold += 0.05;
 				redetect = true;
 			}       
 		} 
 		
 		if ( _display.is_keyW() )
 		{ 
-			if ( _hld_threshold - 0.1 != 0.0)
+			if ( _hcd_low_threshold - 0.05 != 0.0)
 			{
-				_hld_threshold -= 0.1;
+				_hcd_low_threshold -= 0.05;
 				redetect = true;
 			}
 		} 
@@ -230,9 +230,9 @@ void hough_detector::gaussian_filter( double **& kernel, double& kernel_sum, con
 		{
 			double sum = 0.0;
 			// weighted sum of the kernel
-			for ( int i = start ; i >= -start ; i-- )
+			for ( int i = -start ; i <= start ; i++ )
 			{
-				for ( int j = start ; j >= -start ; j-- )
+				for ( int j = -start ; j <= start ; j++ )
 				{
 					int r = row + i;
 					int c = col + j;
@@ -273,7 +273,7 @@ void hough_detector::canny_edge_detector ()
 	// apply sobel filter
 	IMG_TYPE output_image ( width , height) ;
 	IMG_TYPE hysterized_image (width, height);
-	
+    IMG_TYPE canny_image (width, height );	
 	double GX[width][height], GY[width][height];
 
 	const int SobelY [3][3] =
@@ -330,18 +330,18 @@ void hough_detector::canny_edge_detector ()
 			}
 			else if ( theta >= PI/8.0 && theta < 3.0 * PI/8.0 )
 			{ 
-				x = 1 ; y = -1;
+				x = 1 ; y = 1;
 			}
 			else if ( theta >= -3.0 * PI/8.0 && theta < -PI/8.0 )
 			{
-				x = 1; y = 1;
+				x = 1; y = -1;
 			}
 			else if ( theta > -3.0 *PI/8.0 || theta < -3.0 * PI/8.0 )
 			{
 				x = 1; y = 0;
 			}
 			else 
-			{}
+			{ LOG(INFO, "bug");}
 
 			int r_left = row - y; 
 			int r_right = row + y;
@@ -364,7 +364,7 @@ void hough_detector::canny_edge_detector ()
 
 			double magnitude_left = (double)hypot(GX[r_left][c_left], GY[r_left][ c_left]);
 			double magnitude_right = (double)hypot(GX[r_right][c_right], GY[r_right][ c_right]);
-			
+		    canny_image (row, col) = magnitude;	
 			if ( magnitude > magnitude_left && magnitude > magnitude_right && magnitude > _min_threshold)
 			{
 				if ( magnitude > _max_threshold )
@@ -378,7 +378,8 @@ void hough_detector::canny_edge_detector ()
 		}
 				
 	}
-	
+
+	_edge_pixels.clear();
 	for ( int row = 0; row < width; row++ )
 	{
 		for ( int col = 0 ; col < height ; col++ )
@@ -413,14 +414,16 @@ void hough_detector::canny_edge_detector ()
 			{
 				hysterized_image(row, col) = output_image(row, col);
 			}
-			
+			if (hysterized_image(row, col) == STRONG_PIXEL)
+			{
+				_edge_pixels.push_back({{(double)row, (double)col},  nullptr, nullptr});
+			}
 		}
 	}
 	//hough_line_detector(hysterized_image);   
 	//std::clog << "max " << max_magnitude << " min "<< min_magnitude << std::endl;
 	_images[2] = hysterized_image;
-
-	
+    //_images[3] = canny_image;
 	_display.set_title ( (DISPLAY_TITLE " ... Ready!") );
 	cimg::wait (1000);
 	RERENDER;
@@ -429,6 +432,21 @@ void hough_detector::canny_edge_detector ()
 
 void hough_detector::hough_circle_detector ()
 {
+	if ( _edge_pixels.empty() )
+	{
+		LOG(ERROR, "no edge pixels");
+		return;
+	}
+
+	struct kd_node_t * edge_pixels_arr = new struct kd_node_t [ _edge_pixels.size () ];
+	for (UINT i = 0; i < _edge_pixels.size() ; i++ )
+	{
+		edge_pixels_arr[i] = _edge_pixels[i];
+	}
+
+	// construct kdtree
+	kdtree edge_tree (edge_pixels_arr, 2);
+
 	std::stringstream ss;
 	ss << "Applying Hough Circle Detection: \t\t" << _hcd_threshold <<" - "  <<  _min_radius<< " , "<< _max_radius; 
 	LOG(INFO, ss.str().c_str() );
@@ -442,7 +460,11 @@ void hough_detector::hough_circle_detector ()
 	// construct list 
 	IMG_TYPE out_image (width, height);
 	IMG_TYPE accumulator (width, height );
-	cimg_forXY(out_image, x, y) out_image(x, y) = NULL_PIXEL;
+	cimg_forXY(out_image, x, y) 
+    {
+        out_image(x, y) = NULL_PIXEL;
+        accumulator(x, y) = NULL_PIXEL;
+    }
 
 	IMG_TYPE hough (width, height);
 	for ( UINT radius = _min_radius; radius < _max_radius ; radius ++ ) 
@@ -463,21 +485,48 @@ void hough_detector::hough_circle_detector ()
 			}
 		}
 
-		double threshold =  (cum_circumference )/ (total * _hcd_threshold); 
+        cimg_forXY(accumulator, x, y) if ( hough(x, y) > accumulator (x, y) ) accumulator(x, y) = hough(x, y);
+        
+
+		double high_threshold =  (cum_circumference )/ (total * _hcd_threshold); 
+        double low_threshold = ( high_threshold * _hcd_low_threshold) ;
 		// double threshold = _hcd_threshold ;
 		for ( int x = 0;  x < width ; x ++ ) 
 		{
 			for ( int y = 0; y < height ; y++ )
 			{
-				if ( ( hough(x, y)) > threshold)
+                int left = x - radius; 
+                int right = x + radius;
+                clamp ( left, 0, width - 1) ; clamp (right , 0 , width - 1);
+                int bound_x = right - left;
+
+                left = y - radius ; 
+                right = y + radius ;
+                clamp ( left, 0, height - 1) ; clamp (right , 0 , height  - 1);
+                int bound_y = right - left;
+
+                double occlusion_factor = (4 * radius * radius) / ((double)( bound_x * bound_y ));
+                high_threshold = high_threshold * occlusion_factor;
+                if ( ( hough(x, y)) > high_threshold )
 				{
-					draw_circle ( out_image, x, y, radius);
-				} 
+					draw_circle ( accumulator, x, y, radius);
+				}
+                //else if ( hough(x, y) > low_threshold )
+                {
+                    //if ( check_circle ( out_image, x, y, radius, edge_tree ) > high_threshold )
+                    {
+                       // draw_circle ( accumulator, x, y, radius);
+                        //LOG(INFO, "mid");
+                    }
+                }
 			}
 		}
 	}
-	_images[4] = hough;
-	_images[5] = out_image;
+    
+    delete [] edge_pixels_arr;
+
+	_images[3] = accumulator;
+	//_images[4] = out_image;
 	
 	_display.set_title ( (DISPLAY_TITLE " ... Ready!") );
 	cimg::wait (1000);
@@ -534,13 +583,14 @@ int hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int 
 	return num_pixels_set; 
 }
 
-void hough_detector::draw_circle (IMG_TYPE & hough, const int x, const int y , const int radius )
+void hough_detector::draw_circle (IMG_TYPE & hough, const int x, const int y , const int radius)
 {
 	const int width = hough.width ();
 	const int height = hough.height ();
-
+    
 	int r = radius;
 	int c = 0;
+    int count = 0; 
 	int decider_2 = 1 - r ;
 	while (r >= c)
 	{
@@ -579,171 +629,59 @@ void hough_detector::draw_circle (IMG_TYPE & hough, const int x, const int y , c
 	}
 }
 
-void hough_detector::hough_line_detector (IMG_TYPE & in_image)
+int hough_detector::check_circle (const IMG_TYPE & hough, const int x, const int y , const int radius, kdtree & edgetree )
 {
-	std::stringstream ss;
-	ss << "Applying Hough Line Detection: \t\t" << _hld_threshold;
-	LOG(INFO, ss.str().c_str() );
+	const int width = hough.width ();
+	const int height = hough.height ();
 
-	_display.set_title ( (DISPLAY_TITLE " ... Applying Hough Line Detection") );
-	
-	// _display.close();
-	const int width = _images[0].width();
-	const int height = _images[0].height();
-	
-	// construct list
+    double dist_threshold = 5;
 
-	IMG_TYPE hough (width, height);
+	int r = radius;
+	int c = 0;
+	int num_pixels_set = 0;
+	int decider_2 = 1 - r ;
 
-	for ( int x = 0 ;  x < width ; x ++ ) 
+    struct kd_node_t * best = nullptr;
+    double dist = 0.0;
+
+	while (r >= c)
 	{
-		for ( int y = 0; y < height ; y++ )
+		for ( int i = -1; i <= 1 ; i += 2)
 		{
-			if ( in_image(x, y) == STRONG_PIXEL)
-			{            
-				accumulate_line ( hough, x, y);
+			for ( int j = -1; j <= 1; j += 2) 
+			{
+				int idx_x = x + r * i;
+				int idx_y = y + c * j;
+				
+				if ( idx_x >= 0 && idx_x < width && idx_y >= 0 && idx_y < height) 
+				{	
+                    struct kd_node_t node = {{(double)idx_x, (double)idx_y}, nullptr, nullptr};
+                    edgetree.nearest( &node, best, dist);
+				    if ( dist < dist_threshold )  num_pixels_set ++;
+				}
+				idx_x = x + c * i;
+				idx_y = y + r * j;
+				
+				if ( idx_x >= 0 && idx_x < width && idx_y >= 0 && idx_y < height) 
+				{	
+                    struct kd_node_t node = {{(double)idx_x, (double)idx_y}, nullptr, nullptr};
+                    edgetree.nearest( &node, best, dist);
+				    if ( dist < dist_threshold )  num_pixels_set ++;
+				}
 			}
 		}
-	}
 
-	double threshold =  _hld_threshold; 
-	// double threshold = _hcd_threshold ;
-	for ( int x = 0;  x < width ; x ++ ) 
-	{
-		for ( int y = 0; y < height ; y++ )
+		c++; 
+		if ( decider_2 <= 0 )
 		{
-			if ( ( hough(x, y)) > threshold)
-			{
-				unmark_line ( in_image, x, y);
-			} 
-		}
-	}
-	_images[3] = hough;
-	
-	_display.set_title ( (DISPLAY_TITLE " ... Ready!") );
-	cimg::wait (1000);
-	RERENDER;
-	_display.set_title ( (DISPLAY_TITLE) );
-}
-
-void hough_detector::accumulate_line( IMG_TYPE & hough, const int m, const int c)
-{
-	const int width = hough.width (); const int height = hough.height ();
-	int x1 = 0; 
-	int y1 = c;
-	clamp (y1, 0, height);
-
-	int x2 = width ;
-	int y2 = m * x2 + c;
-	clamp (y2, 0, height);
-
-	// Bresenham's line algorithm
-	const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
-	if(steep)
-	{
-		std::swap(x1, y1);
-		std::swap(x2, y2);
-	}
-
-	if(x1 > x2)
-	{
-		std::swap(x1, x2);
-		std::swap(y1, y2);
-	}
-
-	const int dx = x2 - x1;
-	const int dy = fabs(y2 - y1);
-
-	float error = dx / 2.0f;
-	const int ystep = (y1 < y2) ? 1 : -1;
-	int y = (int)y1;
-
-	const int maxX = (int)x2;
-
-	for(int x=(int)x1; x<maxX; x++)
-	{
-		if(steep)
-		{
-			if ( y < width && y >= 0 && x < height && x >= 0)
-			{
-				hough(y, x) ++;
-			} 
+			decider_2 += 2 * c + 1;
 		}
 		else
 		{
-			if ( x < width && x >= 0 && y < height && y >= 0)
-			{
-				hough(x, y) ++;
-			} 
+			r-- ;
+			decider_2 += 2 * ( c - r ) + 1;
 		}
- 
-		error -= dy;
-		if(error < 0)
-		{
-			y += ystep;
-			error += dx;
-		}
+
 	}
+	return num_pixels_set; 
 }
-
-void hough_detector::unmark_line( IMG_TYPE & hough, const int m, const int c)
-{
-	const int width = hough.width (); const int height = hough.height ();
-
-	int x1 = 0; 
-	int y1 = c;
-	clamp (y1, 0, height);
-
-	int x2 = width ;
-	int y2 = m * x2 + c;
-	clamp (y2, 0, height);
-
-	// Bresenham's line algorithm
-	const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
-	if(steep)
-	{
-		std::swap(x1, y1);
-		std::swap(x2, y2);
-	}
-
-	if(x1 > x2)
-	{
-		std::swap(x1, x2);
-		std::swap(y1, y2);
-	}
-
-	const int dx = x2 - x1;
-	const int dy = fabs(y2 - y1);
-
-	float error = dx / 2.0f;
-	const int ystep = (y1 < y2) ? 1 : -1;
-	int y = (int)y1;
-
-	const int maxX = (int)x2;
-
-	for(int x=(int)x1; x<maxX; x++)
-	{
-		if(steep)
-		{
-			if ( y < width && y >= 0 && x < height && x >= 0)
-			{
-				hough(y, x) = NULL_PIXEL;
-			} 
-		}
-		else
-		{
-			if ( x < width && x >= 0 && y < height && y >= 0)
-			{
-				hough(x, y) = NULL_PIXEL;
-			} 
-		}
- 
-		error -= dy;
-		if(error < 0)
-		{
-			y += ystep;
-			error += dx;
-		}
-	}
-}
-

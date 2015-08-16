@@ -1,7 +1,7 @@
 #include "kdtree.h"
 
-void kdtree::nearest(struct kd_node_t *root, struct kd_node_t *nd, int i,
-		struct kd_node_t **best, double *best_dist)
+void kdtree::nearest(struct kd_node_t *& root, struct kd_node_t *& nd, int i,
+		struct kd_node_t *&best, double &best_dist)
 {
 	double d, dx, dx2;
  
@@ -10,24 +10,24 @@ void kdtree::nearest(struct kd_node_t *root, struct kd_node_t *nd, int i,
 	dx = root->x[i] - nd->x[i];
 	dx2 = dx * dx;
 
-	if (!*best || d < *best_dist) 
+	if (!best || d < best_dist) 
 	{
-		*best_dist = d;
-		*best = root;
+		best_dist = d;
+		best = root;
 	}
  
 	/* if chance of exact match is high */
-	if (!*best_dist) return;
+	if (!best_dist) return;
  
-	if (++i >= _dim) i = 0;
+	if (++i >= (int)_dim) i = 0;
  
 	nearest(dx > 0 ? root->left : root->right, nd, i, best, best_dist);
-	if (dx2 >= *best_dist) return;
+	if (dx2 >= best_dist) return;
 	nearest(dx > 0 ? root->right : root->left, nd, i, best, best_dist);
 }
 
-struct kd_node_t* 
-kdtree::make_tree(struct kd_node_t *t, int len, int i)
+struct kd_node_t*
+kdtree::make_tree(struct kd_node_t * t, int len, int i)
 {
 	struct kd_node_t *n;
  
@@ -43,7 +43,7 @@ kdtree::make_tree(struct kd_node_t *t, int len, int i)
 }
 
 struct kd_node_t*
-kdtree::find_median(struct kd_node_t *start, struct kd_node_t *end, int idx)
+kdtree::find_median(struct kd_node_t *& start, struct kd_node_t * end, int idx)
 {
 	if (end <= start) return NULL;
 	if (end == start + 1)
@@ -74,9 +74,12 @@ kdtree::find_median(struct kd_node_t *start, struct kd_node_t *end, int idx)
 	}
 }
 
-void kdtree::nearest(struct kd_node_t *& node, struct kd_node_t *& best, double & dist )
+void kdtree::nearest(struct kd_node_t * node, struct kd_node_t *& best, double & dist )
 {
-
+    if ( _root ) 
+    {
+        nearest (_root , node, 0, best, dist);
+    }
 }
 double
 kdtree::dist(struct kd_node_t *& a, struct kd_node_t *& b)
@@ -90,9 +93,18 @@ kdtree::dist(struct kd_node_t *& a, struct kd_node_t *& b)
 	return d;
 }
 
-kdtree::kdtree(UINT dim) : _dim(dim)
+kdtree::kdtree(struct kd_node_t *& t, UINT len, UINT dim) : _dim(dim)
 {
     _root = nullptr;
+    if ( len > 0)
+    {
+        _root = make_tree ( t, len, 0); 
+    }
+}
+
+kdtree::~kdtree()
+{
+
 }
 
 void kdtree::swap_node(struct kd_node_t *x, struct kd_node_t * y)

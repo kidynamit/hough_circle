@@ -13,12 +13,14 @@
 #include <sstream>
 #include <cmath>
 
+#include <vector>
+
 #include <omp.h>
 
 typedef unsigned char UCHAR;
 typedef unsigned int UINT;
 typedef unsigned short USHORT;
-typedef float PIXEL_TYPE;
+typedef double PIXEL_TYPE;
 using namespace cimg_library;
 
 typedef CImg<PIXEL_TYPE> IMG_TYPE;
