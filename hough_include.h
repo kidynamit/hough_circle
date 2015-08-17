@@ -11,6 +11,8 @@
 #define MAX(A, B) ( (A) > (B) ? (A) : (B) )
 
 #include "CImg.h"
+#include "utils.h"
+
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -29,21 +31,9 @@ using namespace cimg_library;
 typedef CImg<PIXEL_TYPE> IMG_TYPE;
 typedef CImgList<PIXEL_TYPE> IMG_LIST_TYPE;
 
-// n choose r
-UINT nCr( UINT n, UINT r );
-
-void clamp( int & val , const int start, const int end );
 
 static const PIXEL_TYPE STRONG_PIXEL = (PIXEL_TYPE)255;
 static const PIXEL_TYPE WEAK_PIXEL = (PIXEL_TYPE)64;
 static const PIXEL_TYPE NULL_PIXEL = (PIXEL_TYPE)0;
-
-#define MAX_DIM 3
-
-struct kd_node_t
-{
-    double x[MAX_DIM];
-    struct kd_node_t *left, *right;
-};
 
 #endif

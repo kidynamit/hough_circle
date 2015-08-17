@@ -7,6 +7,8 @@
 
 #define DISPLAY_TITLE "Hough Circle Detector"
 
+#define RERENDER { _display.resize ( _display, false).display(_images); }//_display.show ();}
+
 class hough_detector
 {    
 private:
@@ -31,7 +33,7 @@ private:
 	void unmark_line( IMG_TYPE & hough, const int m, const int c);
     void accumulate_line( IMG_TYPE & hough, const int m, const int c);
 
-    int check_circle (const IMG_TYPE & hough, const int x, const int y , const int radius, kdtree & edgetree );
+    double check_circle (const IMG_TYPE & hough, const int x, const int y , const int radius, kdtree & edgetree );
     
     int accumulate_circle(IMG_TYPE & hough, const int x, const int y, const int radius );
     void draw_circle(IMG_TYPE & hough, const int x, const int y, const int radius);
