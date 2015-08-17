@@ -1,33 +1,37 @@
 #include "hough_detector.h"
+// SOURCE FOR CIRCLE DETECTn
 
+/**
+ * perform the hough circle detection from a given minimum radius
+ * to the maximum radius of the image precomputed.
+ */
 void hough_detector::hough_circle_detector ()
 {
-	if ( _edge_pixels.empty() )
+	std::stringstream ss, debug_info;
+	ss << "Applying Hough Circle Detection: \t\t" << _hcd_threshold <<" - "  <<  _min_radius<< " , "<< _max_radius; 
+	LOG(INFO, ss.str().c_str() );
+	_display.set_title ( (DISPLAY_TITLE " ... Applying Hough Circle Detection") );
+    
+    if ( _edge_pixels.empty() )
 	{
 		LOG(ERROR, "no edge pixels");
 		return;
-	}
-
+    }
+    
 	struct kd_node_t * edge_pixels_arr = new struct kd_node_t [ _edge_pixels.size () ];
 	for (UINT i = 0; i < _edge_pixels.size() ; i++ )
 	{
 		edge_pixels_arr[i] = _edge_pixels[i];
 	}
 
-	// construct kdtree
+    // construct kdtree
 	kdtree edge_tree (edge_pixels_arr, 2);
-
-	std::stringstream ss, debug_info;
-	ss << "Applying Hough Circle Detection: \t\t" << _hcd_threshold <<" - "  <<  _min_radius<< " , "<< _max_radius; 
-	LOG(INFO, ss.str().c_str() );
-
-	_display.set_title ( (DISPLAY_TITLE " ... Applying Hough Circle Detection") );
 	
-	// _display.close();
-	const int width = _images[0].width();
+    const int width = _images[0].width();
 	const int height = _images[0].height();
-	
-	// construct list 
+    _max_radius = (UINT) MIN(height, width)/2;
+
+    // construct list 
 	IMG_TYPE accumulator (width, height );
 	cimg_forXY(accumulator, x, y) 
     {
@@ -96,6 +100,11 @@ void hough_detector::hough_circle_detector ()
 	_display.set_title ( (DISPLAY_TITLE) );
 }
 
+/**
+ * accumulates circles to the hough paramater space 
+ * simply accumulate the pixel intensity by 1
+ * Uses the Bresenham circle algorithm
+ */
 int hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int y , const int radius )
 {
 	const int width = hough.width ();
@@ -115,7 +124,8 @@ int hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int 
 				int idx_y = y + c * j;
 				
 				if ( idx_x >= 0 && idx_x < width && idx_y >= 0 && idx_y < height ) 
-				{	
+				{
+                    // accumulate
 					hough(idx_x, idx_y) = hough(idx_x, idx_y) + 1;
 					num_pixels_set ++;
 				}
@@ -144,7 +154,11 @@ int hough_detector::accumulate_circle (IMG_TYPE & hough, const int x, const int 
 	}
 	return num_pixels_set; 
 }
-
+/**
+ * Draws the circle on an image. 
+ * it is used for mapping from parameter space to input space
+ * Uses Bresenham Circle Drawing algorithm
+ */
 void hough_detector::draw_circle (IMG_TYPE & hough, const int x, const int y , const int radius)
 {
 	const int width = hough.width ();
@@ -164,6 +178,7 @@ void hough_detector::draw_circle (IMG_TYPE & hough, const int x, const int y , c
 				
 				if ( idx_x >= 0 && idx_x < width && idx_y >= 0 && idx_y < height ) 
 				{
+                    // set pixel
 					hough(idx_x, idx_y) = STRONG_PIXEL;
 				}
 				idx_x = x + c * i;
@@ -189,7 +204,10 @@ void hough_detector::draw_circle (IMG_TYPE & hough, const int x, const int y , c
 
 	}
 }
-
+/**
+ * Calculates the difference area between the circle being drawn 
+ * and the pseudo bounded set of nearest edge pixels surrounding the circle
+ */
 double hough_detector::check_circle (const IMG_TYPE & hough, const int x, const int y , const int radius, kdtree & edgetree )
 {
 	const int width = hough.width ();
@@ -215,8 +233,8 @@ double hough_detector::check_circle (const IMG_TYPE & hough, const int x, const 
 				if ( idx_x >= 0 && idx_x < width && idx_y >= 0 && idx_y < height) 
 				{	
                     struct kd_node_t node = {{(double)idx_x, (double)idx_y}, nullptr, nullptr};
-                    edgetree.nearest( &node, best, dist);
-                    area += dist; 
+                    edgetree.nearest( &node, best, dist); // get the nearest
+                    area += dist; // increment the discretised area
 				}
 				idx_x = x + c * i;
 				idx_y = y + r * j;

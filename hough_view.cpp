@@ -1,5 +1,9 @@
 #include "hough_detector.h"
 
+/**
+ * the event loop of the display
+ * this handles keyboard event and presses.
+ */
 void hough_detector::event_loop()
 {
 	double ** kernel = nullptr;
@@ -97,7 +101,9 @@ void hough_detector::event_loop()
 		}
 	}
 }
-
+/**
+ * prints the instructional controls of the program
+ */
 void hough_detector::print_usage() 
 {
 	std::clog << (

@@ -88,6 +88,6 @@ dilate:
 finish:
     return out_image;
 }
-
+// totally unreadable code thanks to the labels. was short of time
 
 #endif

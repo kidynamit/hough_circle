@@ -1,5 +1,9 @@
 #include "kdtree.h"
 
+/**
+ * recursively finds the nearest node and the distance to the nearest 
+ * node in the kd tree
+ */
 void kdtree::nearest(struct kd_node_t *& root, struct kd_node_t *& nd, int i,
 		struct kd_node_t *&best, double &best_dist)
 {
@@ -26,6 +30,9 @@ void kdtree::nearest(struct kd_node_t *& root, struct kd_node_t *& nd, int i,
 	nearest(dx > 0 ? root->right : root->left, nd, i, best, best_dist);
 }
 
+/**
+ * constructs a kd tree given an array of nodes
+ */
 struct kd_node_t*
 kdtree::make_tree(struct kd_node_t * t, int len, int i)
 {
@@ -42,6 +49,10 @@ kdtree::make_tree(struct kd_node_t * t, int len, int i)
 	return n;
 }
 
+/**
+ * calculates the median between two nodes
+ * uses the iterative quick select method
+ */
 struct kd_node_t*
 kdtree::find_median(struct kd_node_t *& start, struct kd_node_t * end, int idx)
 {
@@ -73,7 +84,9 @@ kdtree::find_median(struct kd_node_t *& start, struct kd_node_t * end, int idx)
 		else        start = store;
 	}
 }
-
+/**
+ * wraps the nearest function to work with the defined root node
+ */
 void kdtree::nearest(struct kd_node_t * node, struct kd_node_t *& best, double & dist )
 {
     if ( _root ) 
@@ -81,6 +94,10 @@ void kdtree::nearest(struct kd_node_t * node, struct kd_node_t *& best, double &
         nearest (_root , node, 0, best, dist);
     }
 }
+/**
+ * returns the square of the Euclidean distance of two points. 
+ * avoids floating points
+ */
 double
 kdtree::dist(struct kd_node_t *& a, struct kd_node_t *& b)
 {
@@ -93,6 +110,9 @@ kdtree::dist(struct kd_node_t *& a, struct kd_node_t *& b)
 	return d;
 }
 
+/**
+ * constructor : makes the tree if a valid array of nodes are given
+ */
 kdtree::kdtree(struct kd_node_t *& t, UINT len, UINT dim) : _dim(dim)
 {
     _root = nullptr;
@@ -104,9 +124,12 @@ kdtree::kdtree(struct kd_node_t *& t, UINT len, UINT dim) : _dim(dim)
 
 kdtree::~kdtree()
 {
-
+    // no private resources needs deallocation
 }
 
+/**
+ * swaps contents of a node
+ */
 void kdtree::swap_node(struct kd_node_t *x, struct kd_node_t * y)
 {
     double tmp[MAX_DIM];
