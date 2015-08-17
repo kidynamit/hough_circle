@@ -2,6 +2,7 @@
 #define  __HOUGH_DETECTOR_H__
 
 #include "hough_include.h"
+#include "hough_morphology.h"
 #include "kdtree.h"
 
 #define DISPLAY_TITLE "Hough Circle Detector"
@@ -24,6 +25,8 @@ private:
     void canny_edge_detector ( );
     void hough_circle_detector ( );
 
+    IMG_TYPE feature_extraction( IMG_TYPE & hysterized_image );
+    
     void hough_line_detector (IMG_TYPE & in_image);
 	void unmark_line( IMG_TYPE & hough, const int m, const int c);
     void accumulate_line( IMG_TYPE & hough, const int m, const int c);

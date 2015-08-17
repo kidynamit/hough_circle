@@ -7,12 +7,15 @@
 
 #define LOG(TYPE, REASON) std::clog << #TYPE << "\t"<< __FILE__ << ":" << __LINE__ << "\t" << (REASON) << std::endl;
 
+#define MIN(A, B) ( (A) > (B) ? (B) : (A) )
+#define MAX(A, B) ( (A) > (B) ? (A) : (B) )
+
 #include "CImg.h"
 #include <iostream>
 #include <string>
 #include <sstream>
 #include <cmath>
-
+#include <bitset>
 #include <vector>
 
 #include <omp.h>

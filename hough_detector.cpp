@@ -9,7 +9,7 @@ hough_detector::hough_detector (const char * file, double sigma , int gaussian_w
 	_min_threshold(min_thresh)
 {
 	_filename = const_cast<char*>(std::string(file).c_str());
-	_hcd_threshold = 4;   
+	_hcd_threshold = 1.22;   
 	_hcd_low_threshold = 0.75 ;
 	init ();
 }
@@ -43,7 +43,7 @@ void hough_detector::init()
 		_min_radius = MIN_RADIUS;
 		_max_radius = ( width > height ) ? height / 2 : width / 2;
 
-		for ( int i = 0; i < 3; i++)
+		for ( int i = 0; i < 4; i++)
 			_images.push_back( IMG_TYPE(width, height));
 
 		std::stringstream ss ;
@@ -142,7 +142,7 @@ void hough_detector::event_loop()
 		
 		if ( _display.is_keyB() )
 		{ 
-			if ( _hcd_threshold - 0.1 != 0.0)
+			if ( _hcd_threshold - 0.1 > 0.0)
 			{
 				_hcd_threshold-= 0.1;
 				redetect_circle = true;
@@ -160,7 +160,7 @@ void hough_detector::event_loop()
 		
 		if ( _display.is_keyW() )
 		{ 
-			if ( _hcd_low_threshold - 0.05 != 0.0)
+			if ( _hcd_low_threshold - 0.05 > 0.0)
 			{
 				_hcd_low_threshold -= 0.05;
 				redetect = true;
@@ -414,17 +414,34 @@ void hough_detector::canny_edge_detector ()
 			{
 				hysterized_image(row, col) = output_image(row, col);
 			}
-			if (hysterized_image(row, col) == STRONG_PIXEL)
-			{
-				_edge_pixels.push_back({{(double)row, (double)col},  nullptr, nullptr});
-			}
 		}
 	}
 	//hough_line_detector(hysterized_image);   
 	//std::clog << "max " << max_magnitude << " min "<< min_magnitude << std::endl;
 	_images[2] = hysterized_image;
-    //_images[3] = canny_image;
-	_display.set_title ( (DISPLAY_TITLE " ... Ready!") );
+	
+
+    // perform operation 
+    // set the morphology operations order
+    const long unsigned int depth = 30 ;
+    std::bitset<depth> order; 
+    order[0] = 1 ; order[1] = 0;
+    for ( int i = 0 ; i < depth ; i++ )
+        order[i] = (i + 1) % 2;
+
+    //for ( int i = depth/2; i < depth; i++ )
+        //order[i] = (i + 1) % 2;
+    _images[3] = morphology_operator (hysterized_image, order);
+    cimg_forXY(_images[3], row, col ) 
+    {
+        if (_images[3](row, col) == STRONG_PIXEL)
+		{
+		    _edge_pixels.push_back({{(double)row, (double)col},  nullptr, nullptr});
+		}
+    }
+
+
+    _display.set_title ( (DISPLAY_TITLE " ... Ready!") );
 	cimg::wait (1000);
 	RERENDER;
 	_display.set_title ( (DISPLAY_TITLE) );
@@ -447,7 +464,7 @@ void hough_detector::hough_circle_detector ()
 	// construct kdtree
 	kdtree edge_tree (edge_pixels_arr, 2);
 
-	std::stringstream ss;
+	std::stringstream ss, debug_info;
 	ss << "Applying Hough Circle Detection: \t\t" << _hcd_threshold <<" - "  <<  _min_radius<< " , "<< _max_radius; 
 	LOG(INFO, ss.str().c_str() );
 
@@ -467,7 +484,7 @@ void hough_detector::hough_circle_detector ()
     }
 
 	IMG_TYPE hough (width, height);
-	for ( UINT radius = _min_radius; radius < _max_radius ; radius ++ ) 
+	for ( int radius = _min_radius; radius < _max_radius ; radius ++ ) 
 	{
 		
 		cimg_forXY(hough, x, y) hough(x, y) = NULL_PIXEL;
@@ -477,7 +494,7 @@ void hough_detector::hough_circle_detector ()
 		{
 			for ( int y = 0; y < height ; y++ )
 			{
-				if ( _images[2](x, y) == STRONG_PIXEL)
+				if ( _images[3](x, y) == STRONG_PIXEL)
 				{            
 					cum_circumference += accumulate_circle ( hough, x, y, radius);
 					total ++;
@@ -486,37 +503,34 @@ void hough_detector::hough_circle_detector ()
 		}
 
         cimg_forXY(accumulator, x, y) if ( hough(x, y) > accumulator (x, y) ) accumulator(x, y) = hough(x, y);
-        
 
-		double high_threshold =  (cum_circumference )/ (total * _hcd_threshold); 
+        double circumference = cum_circumference  / (double) total;
+
+		double high_threshold =  (circumference /  _hcd_threshold); 
         double low_threshold = ( high_threshold * _hcd_low_threshold) ;
 		// double threshold = _hcd_threshold ;
-		for ( int x = 0;  x < width ; x ++ ) 
+		for ( int x = 0;  x < width ; x++ ) 
 		{
 			for ( int y = 0; y < height ; y++ )
 			{
-                int left = x - radius; 
-                int right = x + radius;
-                clamp ( left, 0, width - 1) ; clamp (right , 0 , width - 1);
-                int bound_x = right - left;
+                int bound_x = MIN(x + radius, width - 1) - MAX(x - radius, 0);
+                int bound_y = MIN(y + radius, height - 1) - MAX(y - radius, 0);
 
-                left = y - radius ; 
-                right = y + radius ;
-                clamp ( left, 0, height - 1) ; clamp (right , 0 , height  - 1);
-                int bound_y = right - left;
-
-                double occlusion_factor = (4 * radius * radius) / ((double)( bound_x * bound_y ));
-                high_threshold = high_threshold * occlusion_factor;
+                double occlusion_factor = ((double) 4.0 * radius * radius) / ((double)( bound_x * bound_y )) ;
+                if ( occlusion_factor < 1.0 ) LOG(WARN, "bug"); 
+                high_threshold = circumference / ( _hcd_threshold * occlusion_factor) ;
                 if ( ( hough(x, y)) > high_threshold )
 				{
-					draw_circle ( accumulator, x, y, radius);
+					//if ( check_circle ( out_image, x, y, radius, edge_tree) > low_threshold ) 
+                    {
+                        draw_circle ( accumulator, x, y, radius);
+                    }
 				}
                 //else if ( hough(x, y) > low_threshold )
                 {
                     //if ( check_circle ( out_image, x, y, radius, edge_tree ) > high_threshold )
                     {
-                       // draw_circle ( accumulator, x, y, radius);
-                        //LOG(INFO, "mid");
+                       //draw_circle ( accumulator, x, y, radius);
                     }
                 }
 			}
@@ -525,7 +539,7 @@ void hough_detector::hough_circle_detector ()
     
     delete [] edge_pixels_arr;
 
-	_images[3] = accumulator;
+	_images[4] = accumulator;
 	//_images[4] = out_image;
 	
 	_display.set_title ( (DISPLAY_TITLE " ... Ready!") );
@@ -634,7 +648,7 @@ int hough_detector::check_circle (const IMG_TYPE & hough, const int x, const int
 	const int width = hough.width ();
 	const int height = hough.height ();
 
-    double dist_threshold = 5;
+    double dist_threshold = 8* ( _max_radius - radius ) / (double) ( _max_radius) ;
 
 	int r = radius;
 	int c = 0;
@@ -643,6 +657,7 @@ int hough_detector::check_circle (const IMG_TYPE & hough, const int x, const int
 
     struct kd_node_t * best = nullptr;
     double dist = 0.0;
+    double area = 0.0; // discrete area 
 
 	while (r >= c)
 	{
@@ -658,6 +673,7 @@ int hough_detector::check_circle (const IMG_TYPE & hough, const int x, const int
                     struct kd_node_t node = {{(double)idx_x, (double)idx_y}, nullptr, nullptr};
                     edgetree.nearest( &node, best, dist);
 				    if ( dist < dist_threshold )  num_pixels_set ++;
+                    area += dist; 
 				}
 				idx_x = x + c * i;
 				idx_y = y + r * j;
@@ -667,6 +683,7 @@ int hough_detector::check_circle (const IMG_TYPE & hough, const int x, const int
                     struct kd_node_t node = {{(double)idx_x, (double)idx_y}, nullptr, nullptr};
                     edgetree.nearest( &node, best, dist);
 				    if ( dist < dist_threshold )  num_pixels_set ++;
+                    area += dist;
 				}
 			}
 		}
@@ -685,3 +702,4 @@ int hough_detector::check_circle (const IMG_TYPE & hough, const int x, const int
 	}
 	return num_pixels_set; 
 }
+
